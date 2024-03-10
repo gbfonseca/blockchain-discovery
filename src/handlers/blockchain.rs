@@ -40,6 +40,19 @@ impl Blockchain {
 
         self.chain.insert(0, block)
     }
+
+    fn last_block(&mut self) -> Block {
+        let block = match self.chain.last() {
+            Some(block) => block,
+            _ => panic!("Last block not found"),
+        };
+        block.to_owned()
+    }
+
+    fn last_hash(&mut self) -> String {
+        let block = self.last_block();
+        block.headers.block_hash
+    }
 }
 
 #[cfg(test)]
@@ -53,5 +66,13 @@ mod tests {
         assert_eq!(blockchain.chain[0].payload.data, "Genesis Block");
         assert_eq!(blockchain.chain[0].payload.seq, 0);
         assert_ne!(blockchain.chain[0].headers.block_hash, "")
+    }
+
+    #[test]
+    fn should_return_last_block_hash() {
+        let mut blockchain = Blockchain::new(4);
+        let last_hash = blockchain.last_hash();
+
+        assert_eq!(last_hash, blockchain.chain[0].headers.block_hash);
     }
 }
