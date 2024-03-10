@@ -53,6 +53,17 @@ impl Blockchain {
         let block = self.last_block();
         block.headers.block_hash
     }
+
+    pub fn create_block(&mut self, data: String) -> Payload {
+        let last_block = self.last_block();
+        let payload = Payload {
+            seq: last_block.payload.seq + 1,
+            previous_hash: self.last_hash(),
+            data,
+            timestamp: Utc::now().timestamp(),
+        };
+        payload
+    }
 }
 
 #[cfg(test)]
@@ -74,5 +85,14 @@ mod tests {
         let last_hash = blockchain.last_hash();
 
         assert_eq!(last_hash, blockchain.chain[0].headers.block_hash);
+    }
+
+    #[test]
+    fn should_create_a_new_block() {
+        let mut blockchain = Blockchain::new(4);
+        let block = blockchain.create_block(String::from("New Block"));
+
+        assert_eq!(block.previous_hash, blockchain.chain[0].headers.block_hash);
+        assert_eq!(block.data, "New Block");
     }
 }
