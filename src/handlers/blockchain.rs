@@ -1,5 +1,7 @@
 use chrono::Utc;
 
+use crate::infra::hasher::generate_hash;
+
 use super::block::{Block, Headers, Payload};
 
 pub struct Blockchain {
@@ -7,6 +9,7 @@ pub struct Blockchain {
     pub chain: Vec<Block>,
 }
 
+#[allow(dead_code)]
 impl Blockchain {
     pub fn new(difficulty: i32) -> Blockchain {
         let mut blockchain = Blockchain {
@@ -26,9 +29,10 @@ impl Blockchain {
             timestamp: Utc::now().timestamp(),
             previous_hash: String::from(""),
         };
+        let serialized_payload = serde_json::to_string(&payload).unwrap();
         let block = Block {
             headers: Headers {
-                block_hash: "123".to_string(),
+                block_hash: generate_hash(&serialized_payload),
                 nonce: 0,
             },
             payload,
@@ -47,6 +51,7 @@ mod tests {
     fn should_create_blockchain() {
         let blockchain = Blockchain::new(4);
         assert_eq!(blockchain.chain[0].payload.data, "Genesis Block");
-        assert_eq!(blockchain.chain[0].payload.seq, 0)
+        assert_eq!(blockchain.chain[0].payload.seq, 0);
+        assert_ne!(blockchain.chain[0].headers.block_hash, "")
     }
 }
