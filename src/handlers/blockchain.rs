@@ -5,16 +5,18 @@ use crate::infra::hasher::generate_hash;
 use super::block::{Block, Headers, Payload};
 
 pub struct Blockchain {
-    pub difficulty: i32,
+    pub difficulty: usize,
     pub chain: Vec<Block>,
+    pub pow_prefix: String,
 }
 
 #[allow(dead_code)]
 impl Blockchain {
-    pub fn new(difficulty: i32) -> Blockchain {
+    pub fn new(difficulty: usize) -> Blockchain {
         let mut blockchain = Blockchain {
             difficulty,
             chain: Vec::new(),
+            pow_prefix: String::from("0"),
         };
         blockchain.generate_genesis_block();
 
@@ -64,6 +66,33 @@ impl Blockchain {
         };
         payload
     }
+
+    pub fn mine_block(&mut self, block: &Payload) -> Option<Block> {
+        let mut nonce = 0;
+        let start = Utc::now().timestamp();
+        loop {
+            let block_serialize = serde_json::to_string(&block).unwrap();
+            let block_hash = generate_hash(&block_serialize);
+            let block_hash_pow = generate_hash(&format!("{}{}", block_hash, nonce));
+
+            let check = self.pow_prefix.repeat(self.difficulty);
+            if block_hash_pow.starts_with(&check) {
+                let end = Utc::now().timestamp();
+                let time_result = end - start;
+                println!(
+                    "Bloco #{} minerado em {}s. Hash {} ({} tentativas)",
+                    block.seq, time_result, block_hash, nonce
+                );
+
+                let new_block = Block {
+                    headers: Headers { block_hash, nonce },
+                    payload: block.to_owned(),
+                };
+                return Some(new_block);
+            }
+            nonce += 1;
+        }
+    }
 }
 
 #[cfg(test)]
@@ -94,5 +123,13 @@ mod tests {
 
         assert_eq!(block.previous_hash, blockchain.chain[0].headers.block_hash);
         assert_eq!(block.data, "New Block");
+    }
+
+    #[test]
+    fn should_mine_the_new_block() {
+        let mut blockchain = Blockchain::new(4);
+        let block = blockchain.create_block(String::from("New Block"));
+        let mine_info = blockchain.mine_block(&block).unwrap();
+        assert_eq!(mine_info.payload.data, block.data);
     }
 }
