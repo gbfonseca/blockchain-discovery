@@ -1,9 +1,10 @@
 use chrono::Utc;
 
-use crate::infra::hasher::generate_hash;
+use crate::{infra::hasher::generate_hash, utils::helpers::validate_hash};
 
 use super::block::{Block, Headers, Payload};
 
+#[derive(Debug)]
 pub struct Blockchain {
     pub difficulty: usize,
     pub chain: Vec<Block>,
@@ -75,8 +76,7 @@ impl Blockchain {
             let block_hash = generate_hash(&block_serialize);
             let block_hash_pow = generate_hash(&format!("{}{}", block_hash, nonce));
 
-            let check = self.pow_prefix.repeat(self.difficulty);
-            if block_hash_pow.starts_with(&check) {
+            if validate_hash(&block_hash_pow, &self.pow_prefix, self.difficulty) {
                 let end = Utc::now().timestamp();
                 let time_result = end - start;
                 println!(
@@ -92,6 +92,44 @@ impl Blockchain {
             }
             nonce += 1;
         }
+    }
+
+    pub fn send_block(&mut self, block: &Block) -> Vec<Block> {
+        if self.verify_block(block) {
+            let block_value = block.clone();
+            self.chain.push(block_value);
+            println!(
+                "Bloco #{} foi adicionado a blockhain {:?}",
+                block.payload.seq, self
+            )
+        }
+        self.chain.to_owned()
+    }
+
+    fn verify_block(&mut self, block: &Block) -> bool {
+        let last_block_hash = self.last_hash();
+        if block.payload.previous_hash != last_block_hash {
+            eprintln!(
+                "Bloco #{} invalido. O Hash anterior e {}",
+                block.payload.seq, last_block_hash
+            );
+            return false;
+        }
+        let block_serialize = serde_json::to_string(&block.payload).unwrap();
+        let test_hash = generate_hash(&format!(
+            "{}{}",
+            generate_hash(&block_serialize),
+            block.headers.nonce
+        ));
+        if !validate_hash(&test_hash, &self.pow_prefix, self.difficulty) {
+            eprintln!(
+                "Bloco #{} invalido. Nonce {} invalido e nao pode ser verificado.",
+                block.payload.seq, block.headers.nonce
+            );
+            return false;
+        }
+
+        true
     }
 }
 
@@ -131,5 +169,14 @@ mod tests {
         let block = blockchain.create_block(String::from("New Block"));
         let mine_info = blockchain.mine_block(&block).unwrap();
         assert_eq!(mine_info.payload.data, block.data);
+    }
+
+    #[test]
+    fn should_send_block() {
+        let mut blockchain = Blockchain::new(4);
+        let block = blockchain.create_block(String::from("New Block on Chain"));
+        let mine_info = blockchain.mine_block(&block).unwrap();
+        let chain = blockchain.send_block(&mine_info);
+        assert_eq!(mine_info.payload.data, chain.last().unwrap().payload.data);
     }
 }
